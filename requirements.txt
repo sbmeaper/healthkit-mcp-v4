@@ -1,0 +1,4 @@
+duckdb
+litellm
+mcp
+pyarrow
