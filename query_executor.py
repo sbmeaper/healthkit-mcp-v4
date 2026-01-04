@@ -32,7 +32,7 @@ def get_connection(tool_config: dict) -> duckdb.DuckDBPyConnection:
         cache_key = ("db", db_path, table_name)
 
         if cache_key not in _connections:
-            _connections[cache_key] = duckdb.connect(db_path, read_only=True)
+            _connections[cache_key] = duckdb.connect(db_path, read_only=False)
 
         return _connections[cache_key]
 

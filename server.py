@@ -4,8 +4,7 @@ from query_executor import execute_with_retry
 from llm_client import generate_sql
 
 # Initialize MCP server
-# TODO: Change server name for your domain
-mcp = FastMCP("nlq-sql")
+mcp = FastMCP("healthkit")
 
 # Load config
 config = load_config()
@@ -37,7 +36,7 @@ def _format_result(result: dict) -> dict:
     return {
         "success": result["success"],
         "columns": result["columns"],
-        "rows": result["rows"][:100] if result["rows"] else None,  # Limit rows returned
+        "rows": result["rows"][:1000] if result["rows"] else None,  # Limit rows returned
         "row_count": result["row_count"],
         "diagnostics": {
             "sql": result["sql"],
@@ -52,17 +51,15 @@ def _format_result(result: dict) -> dict:
 @mcp.tool()
 def query_data(question: str, ctx: Context) -> dict:
     """
-    Query data using natural language.
+    Query Apple HealthKit data using natural language.
 
     Args:
-        question: A natural language question about your data
+        question: A natural language question about health metrics
 
     Returns:
         Query results with columns, rows, SQL used, and diagnostic metrics
 
-    # TODO: Update this docstring to describe your specific data domain
-    # The docstring is shown to the MCP client (e.g., Claude) and helps it
-    # understand when and how to use this tool.
+    Includes: steps, distance, heart rate, sleep, workouts, body measurements, nutrition, and other Apple Health metrics.
     """
     client_name = _get_client_name(ctx)
 

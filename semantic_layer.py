@@ -36,7 +36,7 @@ def _get_data_source(tool_config: dict) -> tuple[duckdb.DuckDBPyConnection, str,
     db_path = db_config.get("db_path", "")
     if db_path:
         db_path = Path(db_path).expanduser()
-        con = duckdb.connect(str(db_path), read_only=True)
+        con = duckdb.connect(str(db_path))
 
         # Auto-discover table if not specified
         if not table_name:
