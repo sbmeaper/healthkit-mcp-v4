@@ -13,7 +13,7 @@
       }
     },
     "database": {
-      "parquet_path": "/Users/scottbartlow/PycharmProjects/healthkit_export_ripper_one_table/health.parquet",
+      "parquet_path": "/Users/scottbartlow/Downloads/apple_health_export/health.parquet",
       "db_path": "",
       "table_name": "health",
       "max_retries": 3
