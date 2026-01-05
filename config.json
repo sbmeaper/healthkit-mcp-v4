@@ -132,7 +132,8 @@
 
         "=== WORKOUT QUERIES ===",
         "Workouts have NULL in 'value' column. Use duration_min for workout duration.",
-        "distance_km and energy_kcal may be NULL for some workouts.",
+        "distance_km is stored in KILOMETERS. When user asks about miles, convert: 1 mile = 1.60934 km. Example: '10 miles' = distance_km > 16.0934",
+        "energy_kcal may be NULL for some workouts.",
         "Count workouts: COUNT(*) WHERE type LIKE 'Workout%'",
         "Workout duration is in minutes (duration_min column).",
         "For 'how long did I cycle', use: SUM(duration_min) WHERE type='WorkoutCycling'",
@@ -212,6 +213,9 @@
 
         "=== SCHEMA PURPOSE ===",
         "This table logs all NLQ-to-SQL query attempts for auditing and analysis.",
+
+        "=== TABLE NAME ===",
+        "Always use the 'query_log' table. Do NOT use 'duckdb_logs' or other system tables.",
 
         "=== KEY COLUMNS ===",
         "request_id: Groups multiple retry attempts for a single user question.",

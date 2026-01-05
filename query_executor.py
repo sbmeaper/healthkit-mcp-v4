@@ -114,7 +114,9 @@ def execute_with_retry(
         tool_config: dict,
         generate_sql_fn: Callable,
         log_path: str,
-        client_name: str = "unknown"
+        start_time: float,
+        client_name: str = "unknown",
+        user_input: Optional[str] = None
 ) -> dict:
     """
     Execute a query with LLM-assisted retry on failure.
@@ -125,7 +127,9 @@ def execute_with_retry(
         tool_config: A tool-specific config section (e.g., config["data_query"])
         generate_sql_fn: Function to generate SQL from question
         log_path: Path to the query log database
+        start_time: time.perf_counter() when tool was called (for elapsed_ms)
         client_name: Name of the MCP client
+        user_input: Raw input from user in client app (for logging)
     """
 
     request_id = str(uuid.uuid4())
@@ -157,11 +161,13 @@ def execute_with_retry(
         query_result = execute_query(sql, tool_config)
 
         # Log this attempt with per-attempt token counts
+        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         log_attempt(
             log_path=log_path,
             request_id=request_id,
             attempt_number=attempt + 1,
             client=client_name,
+            user_input=user_input,
             nlq=question,
             sql=sql,
             success=query_result["success"],
@@ -169,7 +175,8 @@ def execute_with_retry(
             row_count=query_result["row_count"] if query_result["success"] else None,
             execution_time_ms=query_result["execution_time_ms"],
             input_tokens=attempt_input_tokens,
-            output_tokens=attempt_output_tokens
+            output_tokens=attempt_output_tokens,
+            elapsed_ms=elapsed_ms
         )
 
         if query_result["success"]:
@@ -182,7 +189,8 @@ def execute_with_retry(
                 "retry_count": attempt,
                 "errors": errors,
                 "input_tokens": total_input_tokens,
-                "output_tokens": total_output_tokens
+                "output_tokens": total_output_tokens,
+                "elapsed_ms": elapsed_ms
             }
 
         # Query failed - save for retry context
@@ -191,6 +199,7 @@ def execute_with_retry(
         previous_error = query_result["error"]
 
     # All retries exhausted
+    final_elapsed_ms = int((time.perf_counter() - start_time) * 1000)
     return {
         "success": False,
         "columns": None,
@@ -200,7 +209,8 @@ def execute_with_retry(
         "retry_count": max_retries,
         "errors": errors,
         "input_tokens": total_input_tokens,
-        "output_tokens": total_output_tokens
+        "output_tokens": total_output_tokens,
+        "elapsed_ms": final_elapsed_ms
     }
 
 
@@ -226,7 +236,9 @@ if __name__ == "__main__":
             tool_config,
             generate_sql,
             log_path=log_path,
-            client_name="test_harness"
+            start_time=time.perf_counter(),
+            client_name="test_harness",
+            user_input="how many rows?"
         )
 
         if result["success"]:
@@ -235,6 +247,7 @@ if __name__ == "__main__":
             print(f"SQL: {result['sql']}")
             print(f"Retries: {result['retry_count']}")
             print(f"Total tokens: {result['input_tokens']} in, {result['output_tokens']} out")
+            print(f"Elapsed: {result['elapsed_ms']}ms")
         else:
             print(f"Query failed after {result['retry_count']} retries")
             print(f"Errors: {result['errors']}")

@@ -12,6 +12,7 @@ def _init_log_table(con: duckdb.DuckDBPyConnection) -> None:
             attempt_number INTEGER,
             timestamp TIMESTAMP,
             client VARCHAR,
+            user_input VARCHAR,
             nlq VARCHAR,
             sql VARCHAR,
             success BOOLEAN,
@@ -19,7 +20,8 @@ def _init_log_table(con: duckdb.DuckDBPyConnection) -> None:
             row_count INTEGER,
             execution_time_ms INTEGER,
             input_tokens INTEGER,
-            output_tokens INTEGER
+            output_tokens INTEGER,
+            elapsed_ms INTEGER
         )
     """)
 
@@ -29,6 +31,7 @@ def log_attempt(
         request_id: str,
         attempt_number: int,
         client: str,
+        user_input: Optional[str],
         nlq: str,
         sql: str,
         success: bool,
@@ -36,7 +39,8 @@ def log_attempt(
         row_count: Optional[int],
         execution_time_ms: int,
         input_tokens: int,
-        output_tokens: int
+        output_tokens: int,
+        elapsed_ms: int
 ) -> None:
     """
     Log a single query attempt. Opens and closes connection per call.
@@ -46,7 +50,8 @@ def log_attempt(
         request_id: UUID grouping retry attempts for a single question
         attempt_number: 1 for initial attempt, 2+ for retries
         client: MCP client name
-        nlq: Original natural language question
+        user_input: Raw input from user in client app (may be None)
+        nlq: Natural language question passed to tool
         sql: Generated SQL
         success: Whether SQL executed without error
         error_message: Database error if failed
@@ -54,6 +59,7 @@ def log_attempt(
         execution_time_ms: Query execution time
         input_tokens: Tokens sent to LLM for this attempt
         output_tokens: Tokens received from LLM for this attempt
+        elapsed_ms: Cumulative time since tool was called
     """
     expanded_path = str(Path(log_path).expanduser())
 
@@ -62,15 +68,16 @@ def log_attempt(
         _init_log_table(con)
         con.execute("""
             INSERT INTO query_log (
-                request_id, attempt_number, timestamp, client, nlq, sql,
+                request_id, attempt_number, timestamp, client, user_input, nlq, sql,
                 success, error_message, row_count, execution_time_ms,
-                input_tokens, output_tokens
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                input_tokens, output_tokens, elapsed_ms
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             request_id,
             attempt_number,
             datetime.now(),
             client,
+            user_input,
             nlq,
             sql,
             success,
@@ -78,7 +85,8 @@ def log_attempt(
             row_count,
             execution_time_ms,
             input_tokens,
-            output_tokens
+            output_tokens,
+            elapsed_ms
         ])
     finally:
         con.close()
@@ -96,6 +104,7 @@ if __name__ == "__main__":
         request_id=str(uuid.uuid4()),
         attempt_number=1,
         client="test",
+        user_input="how many rows?",
         nlq="How many rows in the table?",
         sql="SELECT COUNT(*) FROM data",
         success=True,
@@ -103,7 +112,8 @@ if __name__ == "__main__":
         row_count=1,
         execution_time_ms=42,
         input_tokens=150,
-        output_tokens=25
+        output_tokens=25,
+        elapsed_ms=500
     )
 
     # Verify it was logged

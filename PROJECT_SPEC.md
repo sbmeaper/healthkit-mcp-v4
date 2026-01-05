@@ -153,7 +153,9 @@ JSON configuration file stored in the project root. Structure with per-tool sect
         "=== KEY COLUMNS ===",
         "request_id: Groups retry attempts for a single question.",
         "attempt_number: 1 = initial, 2+ = retry.",
-        "success: TRUE if SQL executed without error."
+        "user_input: Raw input from user in client app.",
+        "success: TRUE if SQL executed without error.",
+        "elapsed_ms: Cumulative time since tool was called."
       ]
     }
   }
@@ -227,8 +229,10 @@ def query_logs(question: str, ctx: Context) -> dict:
     The query_log table tracks all NLQ-to-SQL attempts with:
     - request_id: Groups retry attempts for a single question
     - attempt_number: 1 = initial, 2+ = retry
+    - user_input: Raw input from user in client app
     - success, error_message, row_count, execution_time_ms
     - input_tokens, output_tokens: LLM token usage
+    - elapsed_ms: Cumulative time since tool was called
     """
 ```
 
@@ -284,14 +288,16 @@ All query attempts from both tools are logged to the `log_query.database.db_path
 | attempt_number | INTEGER | 1 for initial, 2+ for retries |
 | timestamp | TIMESTAMP | When the attempt occurred |
 | client | VARCHAR | MCP client name |
-| nlq | VARCHAR | Original natural language question |
+| user_input | VARCHAR | Raw input from user in client app |
+| nlq | VARCHAR | Natural language question passed to tool |
 | sql | VARCHAR | Generated SQL |
 | success | BOOLEAN | Whether SQL executed without error |
 | error_message | VARCHAR | Database error if failed |
 | row_count | INTEGER | Rows returned if successful |
-| execution_time_ms | INTEGER | Query execution time |
+| execution_time_ms | INTEGER | Query execution time (DuckDB only) |
 | input_tokens | INTEGER | Tokens sent to LLM for this attempt |
 | output_tokens | INTEGER | Tokens received from LLM for this attempt |
+| elapsed_ms | INTEGER | Cumulative time since tool was called |
 
 **Uses:**
 - Identify common failure patterns → refine semantic layer
