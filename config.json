@@ -5,6 +5,7 @@
       "endpoint": "http://localhost:11434",
       "api_key": "",
       "keep_alive": "15m",
+      "no_think": true,
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
         "include_sample_rows": true,
@@ -194,6 +195,7 @@
       "endpoint": "http://localhost:11434",
       "api_key": "",
       "keep_alive": "15m",
+      "no_think": true,
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
         "include_sample_rows": true,

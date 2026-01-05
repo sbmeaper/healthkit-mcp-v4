@@ -30,12 +30,16 @@ def call_llm(prompt: str, tool_config: dict) -> dict:
         "temperature": 0
     }
 
-    # For Ollama, set api_base and keep model loaded
+    # For Ollama, set api_base and optional settings
     if model.startswith("ollama/") and endpoint:
         kwargs["api_base"] = endpoint
         keep_alive = tool_config["llm"].get("keep_alive")
         if keep_alive:
             kwargs["extra_body"] = {"keep_alive": keep_alive}
+
+    # Prepend /no_think to disable thinking mode (e.g., qwen3)
+    if tool_config["llm"].get("no_think"):
+        kwargs["messages"][0]["content"] = "/no_think " + prompt
 
     # For cloud providers, api_key can be set here or via env var
     # LiteLLM checks ANTHROPIC_API_KEY, OPENAI_API_KEY, etc. automatically
