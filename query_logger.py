@@ -21,7 +21,8 @@ def _init_log_table(con: duckdb.DuckDBPyConnection) -> None:
             execution_time_ms INTEGER,
             input_tokens INTEGER,
             output_tokens INTEGER,
-            elapsed_ms INTEGER
+            elapsed_ms INTEGER,
+            sql_generator_llm VARCHAR
         )
     """)
 
@@ -40,7 +41,8 @@ def log_attempt(
         execution_time_ms: int,
         input_tokens: int,
         output_tokens: int,
-        elapsed_ms: int
+        elapsed_ms: int,
+        sql_generator_llm: str
 ) -> None:
     """
     Log a single query attempt. Opens and closes connection per call.
@@ -60,6 +62,7 @@ def log_attempt(
         input_tokens: Tokens sent to LLM for this attempt
         output_tokens: Tokens received from LLM for this attempt
         elapsed_ms: Cumulative time since tool was called
+        sql_generator_llm: LLM model used to generate the SQL
     """
     expanded_path = str(Path(log_path).expanduser())
 
@@ -70,8 +73,8 @@ def log_attempt(
             INSERT INTO query_log (
                 request_id, attempt_number, timestamp, client, user_input, nlq, sql,
                 success, error_message, row_count, execution_time_ms,
-                input_tokens, output_tokens, elapsed_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                input_tokens, output_tokens, elapsed_ms, sql_generator_llm
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             request_id,
             attempt_number,
@@ -86,7 +89,8 @@ def log_attempt(
             execution_time_ms,
             input_tokens,
             output_tokens,
-            elapsed_ms
+            elapsed_ms,
+            sql_generator_llm
         ])
     finally:
         con.close()
@@ -113,7 +117,8 @@ if __name__ == "__main__":
         execution_time_ms=42,
         input_tokens=150,
         output_tokens=25,
-        elapsed_ms=500
+        elapsed_ms=500,
+        sql_generator_llm="test/model:7b"
     )
 
     # Verify it was logged

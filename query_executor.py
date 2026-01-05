@@ -176,7 +176,8 @@ def execute_with_retry(
             execution_time_ms=query_result["execution_time_ms"],
             input_tokens=attempt_input_tokens,
             output_tokens=attempt_output_tokens,
-            elapsed_ms=elapsed_ms
+            elapsed_ms=elapsed_ms,
+            sql_generator_llm=tool_config["llm"]["model"]
         )
 
         if query_result["success"]:

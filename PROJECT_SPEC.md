@@ -98,7 +98,7 @@ JSON configuration file stored in the project root. Structure with per-tool sect
 {
   "data_query": {
     "llm": {
-      "model": "ollama/qwen2.5-coder:7b",
+      "model": "ollama/qwen3:8b",
       "endpoint": "http://localhost:11434",
       "api_key": "",
       "prompt_format": {
@@ -134,7 +134,7 @@ JSON configuration file stored in the project root. Structure with per-tool sect
   },
   "log_query": {
     "llm": {
-      "model": "ollama/qwen2.5-coder:7b",
+      "model": "ollama/qwen3:8b",
       "endpoint": "http://localhost:11434",
       "api_key": "",
       "prompt_format": { ... }
@@ -168,7 +168,7 @@ Uses [LiteLLM](https://github.com/BerriAI/litellm) for provider-agnostic LLM cal
 
 | Setting | Description |
 |---------|-------------|
-| `model` | LiteLLM model string (e.g., `ollama/qwen2.5-coder:7b`, `anthropic/claude-sonnet-4-5-20250929`, `gpt-4`) |
+| `model` | LiteLLM model string (e.g., `ollama/qwen3:8b`, `anthropic/claude-sonnet-4-5-20250929`, `gpt-4`) |
 | `endpoint` | API base URL (required for Ollama, ignored for cloud providers) |
 | `api_key` | API key (or set via environment: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.) |
 
@@ -183,10 +183,50 @@ Uses [LiteLLM](https://github.com/BerriAI/litellm) for provider-agnostic LLM cal
 },
 "log_query": {
   "llm": {
-    "model": "ollama/qwen2.5-coder:7b",
+    "model": "ollama/qwen3:8b",
     "endpoint": "http://localhost:11434"
   }
 }
+```
+
+### LLM Model Selection (Local/Ollama)
+
+For local LLM deployment on Apple Silicon (16GB RAM), we tested several models for text-to-SQL accuracy and instruction-following. The key issue was models adding unsolicited WHERE clauses (e.g., filtering by `source_name`) when the semantic layer explicitly says "Do not filter on columns unless the question explicitly mentions them."
+
+**Benchmark Results (5 test queries, Mac M4 16GB):**
+
+| Model | Accuracy | Avg Time | Avg Tokens | Notes |
+|-------|----------|----------|------------|-------|
+| qwen2.5-coder:7b | 3/5 (60%) | ~24s | ~55 | Fast but ignores "don't filter" instruction |
+| qwen3:8b (thinking) | 4/5 (80%) | ~85s | ~1100 | Better instruction-following, slow |
+| **qwen3:8b (/no_think)** | **5/5 (100%)** | **~62s** | **~650** | **Best accuracy, reasonable speed** |
+
+**Recommendation:** Use `ollama/qwen3:8b` with `/no_think` prefix in prompts for best instruction-following. The thinking mode improves reasoning but adds significant latency.
+
+**Other models considered:**
+- `duckdb-nsql:7b` — Purpose-built for DuckDB, but trained on schema→SQL patterns, not semantic layer instructions
+- `sqlcoder:15b` — Requires 16GB+ RAM, marginal benefit over qwen3:8b
+- `qwen2.5-coder:14b` — Larger version of 7b, may fit with Q4 quantization
+
+### Ollama Performance Tuning
+
+By default, Ollama unloads models after 5 minutes of idle time. For MCP servers with intermittent queries, this causes slow cold starts (~5-10s model load time).
+
+**Solution:** Set `keep_alive` in LLM client to keep model loaded between requests:
+
+```python
+# In llm_client.py
+kwargs["keep_alive"] = "15m"  # Keep model loaded for 15 minutes
+```
+
+To manually unload a model:
+```bash
+ollama stop qwen3:8b
+```
+
+To check what's currently loaded:
+```bash
+ollama ps
 ```
 
 ### LLM Prompt Format Options
@@ -233,6 +273,7 @@ def query_logs(question: str, ctx: Context) -> dict:
     - success, error_message, row_count, execution_time_ms
     - input_tokens, output_tokens: LLM token usage
     - elapsed_ms: Cumulative time since tool was called
+    - sql_generator_llm: LLM model used to generate the SQL
     """
 ```
 
@@ -298,6 +339,7 @@ All query attempts from both tools are logged to the `log_query.database.db_path
 | input_tokens | INTEGER | Tokens sent to LLM for this attempt |
 | output_tokens | INTEGER | Tokens received from LLM for this attempt |
 | elapsed_ms | INTEGER | Cumulative time since tool was called |
+| sql_generator_llm | VARCHAR | LLM model used to generate the SQL |
 
 **Uses:**
 - Identify common failure patterns → refine semantic layer
