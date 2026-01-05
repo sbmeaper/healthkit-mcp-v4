@@ -4,6 +4,7 @@
       "model": "ollama/qwen3:8b",
       "endpoint": "http://localhost:11434",
       "api_key": "",
+      "keep_alive": "15m",
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
         "include_sample_rows": true,
@@ -192,6 +193,7 @@
       "model": "ollama/qwen2.5-coder:7b",
       "endpoint": "http://localhost:11434",
       "api_key": "",
+      "keep_alive": "15m",
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
         "include_sample_rows": true,

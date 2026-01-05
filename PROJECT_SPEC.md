@@ -101,6 +101,7 @@ JSON configuration file stored in the project root. Structure with per-tool sect
       "model": "ollama/qwen3:8b",
       "endpoint": "http://localhost:11434",
       "api_key": "",
+      "keep_alive": "15m",
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
         "include_sample_rows": true,
@@ -171,6 +172,7 @@ Uses [LiteLLM](https://github.com/BerriAI/litellm) for provider-agnostic LLM cal
 | `model` | LiteLLM model string (e.g., `ollama/qwen3:8b`, `anthropic/claude-sonnet-4-5-20250929`, `gpt-4`) |
 | `endpoint` | API base URL (required for Ollama, ignored for cloud providers) |
 | `api_key` | API key (or set via environment: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.) |
+| `keep_alive` | Ollama only: how long to keep model loaded (e.g., `"15m"`, `"1h"`, `"0"` to unload immediately) |
 
 **Example: Local for logs, cloud for data queries:**
 
@@ -184,7 +186,8 @@ Uses [LiteLLM](https://github.com/BerriAI/litellm) for provider-agnostic LLM cal
 "log_query": {
   "llm": {
     "model": "ollama/qwen3:8b",
-    "endpoint": "http://localhost:11434"
+    "endpoint": "http://localhost:11434",
+    "keep_alive": "15m"
   }
 }
 ```
@@ -212,11 +215,24 @@ For local LLM deployment on Apple Silicon (16GB RAM), we tested several models f
 
 By default, Ollama unloads models after 5 minutes of idle time. For MCP servers with intermittent queries, this causes slow cold starts (~5-10s model load time).
 
-**Solution:** Set `keep_alive` in LLM client to keep model loaded between requests:
+**Solution:** Set `keep_alive` in config.json to keep model loaded between requests:
+
+```json
+"llm": {
+  "model": "ollama/qwen3:8b",
+  "endpoint": "http://localhost:11434",
+  "keep_alive": "15m",
+  ...
+}
+```
+
+**Implementation note:** LiteLLM doesn't pass `keep_alive` directly to Ollama. Use `extra_body` in llm_client.py:
 
 ```python
-# In llm_client.py
-kwargs["keep_alive"] = "15m"  # Keep model loaded for 15 minutes
+# In llm_client.py - LiteLLM requires extra_body for Ollama-specific params
+keep_alive = tool_config["llm"].get("keep_alive")
+if keep_alive:
+    kwargs["extra_body"] = {"keep_alive": keep_alive}
 ```
 
 To manually unload a model:

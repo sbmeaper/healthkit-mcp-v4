@@ -33,7 +33,9 @@ def call_llm(prompt: str, tool_config: dict) -> dict:
     # For Ollama, set api_base and keep model loaded
     if model.startswith("ollama/") and endpoint:
         kwargs["api_base"] = endpoint
-        kwargs["keep_alive"] = "15m"  # Keep model loaded between requests
+        keep_alive = tool_config["llm"].get("keep_alive")
+        if keep_alive:
+            kwargs["extra_body"] = {"keep_alive": keep_alive}
 
     # For cloud providers, api_key can be set here or via env var
     # LiteLLM checks ANTHROPIC_API_KEY, OPENAI_API_KEY, etc. automatically
