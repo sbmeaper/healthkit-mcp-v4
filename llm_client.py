@@ -155,7 +155,8 @@ Analyze the error and generate corrected SQL. Do not repeat the same mistake.
     return {
         "sql": sql,
         "input_tokens": result["input_tokens"],
-        "output_tokens": result["output_tokens"]
+        "output_tokens": result["output_tokens"],
+        "prompt": prompt
     }
 
 

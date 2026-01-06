@@ -22,7 +22,8 @@ def _init_log_table(con: duckdb.DuckDBPyConnection) -> None:
             input_tokens INTEGER,
             output_tokens INTEGER,
             elapsed_ms INTEGER,
-            sql_generator_llm VARCHAR
+            sql_generator_llm VARCHAR,
+            sql_generating_llm_prompt VARCHAR
         )
     """)
 
@@ -42,7 +43,8 @@ def log_attempt(
         input_tokens: int,
         output_tokens: int,
         elapsed_ms: int,
-        sql_generator_llm: str
+        sql_generator_llm: str,
+        sql_generating_llm_prompt: str
 ) -> None:
     """
     Log a single query attempt. Opens and closes connection per call.
@@ -63,6 +65,7 @@ def log_attempt(
         output_tokens: Tokens received from LLM for this attempt
         elapsed_ms: Cumulative time since tool was called
         sql_generator_llm: LLM model used to generate the SQL
+        sql_generating_llm_prompt: Full prompt sent to the SQL-generating LLM
     """
     expanded_path = str(Path(log_path).expanduser())
 
@@ -73,8 +76,9 @@ def log_attempt(
             INSERT INTO query_log (
                 request_id, attempt_number, timestamp, client, user_input, nlq, sql,
                 success, error_message, row_count, execution_time_ms,
-                input_tokens, output_tokens, elapsed_ms, sql_generator_llm
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                input_tokens, output_tokens, elapsed_ms, sql_generator_llm,
+                sql_generating_llm_prompt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             request_id,
             attempt_number,
@@ -90,7 +94,8 @@ def log_attempt(
             input_tokens,
             output_tokens,
             elapsed_ms,
-            sql_generator_llm
+            sql_generator_llm,
+            sql_generating_llm_prompt
         ])
     finally:
         con.close()
@@ -118,7 +123,8 @@ if __name__ == "__main__":
         input_tokens=150,
         output_tokens=25,
         elapsed_ms=500,
-        sql_generator_llm="test/model:7b"
+        sql_generator_llm="test/model:7b",
+        sql_generating_llm_prompt="Test prompt for SQL generation"
     )
 
     # Verify it was logged

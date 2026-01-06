@@ -153,6 +153,7 @@ def execute_with_retry(
         sql = llm_result["sql"]
         attempt_input_tokens = llm_result["input_tokens"]
         attempt_output_tokens = llm_result["output_tokens"]
+        attempt_prompt = llm_result["prompt"]
 
         total_input_tokens += attempt_input_tokens
         total_output_tokens += attempt_output_tokens
@@ -177,7 +178,8 @@ def execute_with_retry(
             input_tokens=attempt_input_tokens,
             output_tokens=attempt_output_tokens,
             elapsed_ms=elapsed_ms,
-            sql_generator_llm=tool_config["llm"]["model"]
+            sql_generator_llm=tool_config["llm"]["model"],
+            sql_generating_llm_prompt=attempt_prompt
         )
 
         if query_result["success"]:
