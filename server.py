@@ -64,6 +64,11 @@ def query_data(question: str, user_input: Optional[str] = None, ctx: Context = N
         Query results with columns, rows, SQL used, and diagnostic metrics
 
     Includes: steps, distance, heart rate, sleep, workouts, body measurements, nutrition, and other Apple Health metrics.
+
+    Location data: Workouts store GPS coordinates (start_lat, start_lon) for starting location only—city/state/country names are NOT stored. When the user asks about workouts in a named location, translate the place name to a coordinate bounding box before querying. Examples:
+    - "Boston" → start_lat BETWEEN 42.2 AND 42.5 AND start_lon BETWEEN -71.3 AND -70.8
+    - "Austin" → start_lat BETWEEN 30.1 AND 30.5 AND start_lon BETWEEN -97.9 AND -97.5
+    - "New York City" → start_lat BETWEEN 40.5 AND 40.9 AND start_lon BETWEEN -74.3 AND -73.7
     """
     start_time = time.perf_counter()
     client_name = _get_client_name(ctx)
