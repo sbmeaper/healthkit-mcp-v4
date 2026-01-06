@@ -30,9 +30,12 @@ def call_llm(prompt: str, tool_config: dict) -> dict:
         "temperature": 0
     }
 
-    # For Ollama, set api_base and optional settings
-    if model.startswith("ollama/") and endpoint:
+    # Set api_base for local endpoints (Ollama or OpenAI-compatible like LM Studio)
+    if endpoint:
         kwargs["api_base"] = endpoint
+
+    # Ollama-specific: keep_alive setting
+    if model.startswith("ollama/"):
         keep_alive = tool_config["llm"].get("keep_alive")
         if keep_alive:
             kwargs["extra_body"] = {"keep_alive": keep_alive}

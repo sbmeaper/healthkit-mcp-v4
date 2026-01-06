@@ -1,10 +1,9 @@
 {
   "data_query": {
     "llm": {
-      "model": "ollama/qwen3:8b",
-      "endpoint": "http://localhost:11434",
-      "api_key": "",
-      "keep_alive": "15m",
+      "model": "openai/qwen3-8b-mlx",
+      "endpoint": "http://localhost:1234/v1",
+      "api_key": "lm-studio",
       "no_think": true,
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
@@ -131,6 +130,11 @@
         "=== STAND HOURS ===",
         "AppleStandHour uses value_category: 'Stood' (met goal) or 'Idle' (did not stand).",
         "Count stand hours: COUNT(*) WHERE type='AppleStandHour' AND value_category='Stood'",
+
+        "=== WORKOUT LOCATION ===",
+        "Workouts have start_lat and start_lon columns with GPS coordinates of the starting location.",
+        "These are only the starting point - full route/track data is not available.",
+        "To find where a workout started: SELECT start_lat, start_lon FROM health WHERE type LIKE 'Workout%'",
 
         "=== WORKOUT QUERIES ===",
         "Workouts have NULL in 'value' column. Use duration_min for workout duration.",
