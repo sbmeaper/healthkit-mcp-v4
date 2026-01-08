@@ -185,10 +185,13 @@ def build_semantic_context(tool_config: dict) -> dict:
             query = query_template.replace("{query_target}", query_target).replace("{table_name}", table_name)
             # Also support legacy placeholder
             query = query.replace("{parquet_path}", query_target)
-            result = con.execute(query).fetchall()
+            cursor = con.execute(query)
+            columns = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
             context["auto_query_results"].append({
                 "query": query_template,
-                "result": result
+                "columns": columns,
+                "rows": rows
             })
         except Exception as e:
             context["auto_query_results"].append({
@@ -254,6 +257,29 @@ def format_context_for_prompt(context: dict, tool_config: dict = None) -> str:
                 parts.append(f"-- {col_name}: {range_info['min']} to {range_info['max']}")
             else:
                 parts.append(f"{col_name}: {range_info['min']} to {range_info['max']}")
+
+    # Auto query results (dynamic context from config-defined queries)
+    if context.get("auto_query_results"):
+        for result in context["auto_query_results"]:
+            if "error" in result:
+                parts.append(f"\n/* Auto query failed: {result['error']} */")
+            else:
+                # Format as CSV for LLM readability
+                parts.append(f"\n/* Auto Query Result */")
+                columns = result["columns"]
+                rows = result["rows"]
+                parts.append(",".join(columns))
+                for row in rows:
+                    csv_values = []
+                    for val in row:
+                        if val is None:
+                            csv_values.append("")
+                        elif isinstance(val, str):
+                            escaped = val.replace('"', '""')
+                            csv_values.append(f'"{escaped}"')
+                        else:
+                            csv_values.append(str(val))
+                    parts.append(",".join(csv_values))
 
     # Domain hints
     if context.get("hints"):

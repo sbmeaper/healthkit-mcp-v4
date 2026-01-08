@@ -127,7 +127,24 @@ API keys can also be set via environment variables (`ANTHROPIC_API_KEY`, `OPENAI
 
 ### Per-Tool Semantic Layer
 
-Each tool has its own `semantic_layer` section with `auto_queries` and `static_context` tailored to its data.
+The semantic layer has three components:
+
+1. **Auto queries**: SQL run at startup, results injected into prompt
+2. **Metric classes CSV**: Maps types to aggregation behavior (SUM/AVG/COUNT)
+3. **Static context**: Domain hints (date handling, aliases, special logic)
+
+```json
+"semantic_layer": {
+  "auto_queries": [
+    "SELECT * FROM read_csv_auto('metric_classes.csv')",
+    "SELECT DISTINCT type, unit FROM {query_target}"
+  ],
+  "static_context": [
+    "=== DATE HANDLING ===",
+    "For 'today': WHERE CAST(start_date AS DATE) = CURRENT_DATE"
+  ]
+}
+```
 
 ## Tools
 
@@ -163,10 +180,11 @@ Queries the server's query log table. Useful for:
 |------|---------|
 | `config.json` | All configuration (per-tool LLM, database, semantic layer) |
 | `server.py` | MCP server entry point with two tools |
-| `semantic_layer.py` | Auto-introspects schema, builds prompt context |
+| `semantic_layer.py` | Auto-introspects schema, runs auto queries, builds prompt context |
 | `llm_client.py` | LLM communication via LiteLLM |
 | `query_executor.py` | SQL execution, retry logic |
 | `query_logger.py` | Audit logging |
+| `metric_classes.csv` | MetricClass → TypeCode → SQLOperations mapping |
 | `PROJECT_SPEC.md` | Full architecture documentation |
 
 ## Query Logging

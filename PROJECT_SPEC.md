@@ -295,25 +295,63 @@ def query_logs(question: str, ctx: Context) -> dict:
 
 ## Semantic Layer
 
-A hybrid approach provides the LLM with data context:
+The semantic layer provides context to the LLM for accurate SQL generation. It has three components:
 
-### Auto-Generated (SQL-driven, built at startup)
+### 1. Auto Queries (SQL-driven, run at startup)
 
-- Schema introspection (column names, types)
-- Distinct values for categorical columns
-- Date range of data
-- Sample data rows (formatted as CSV for clarity)
+SQL queries defined in `auto_queries` that run at startup and inject results into the prompt:
 
-### Manually Curated (config-driven)
+```json
+"auto_queries": [
+  "SELECT MetricClass, TypeCode, SQLOperations FROM read_csv_auto('metric_classes.csv')",
+  "SELECT DISTINCT type, unit FROM {query_target} WHERE unit IS NOT NULL",
+  "SELECT type, COUNT(*) as row_count FROM {query_target} GROUP BY type"
+]
+```
 
-- Database engine syntax notes
-- Natural language → database value mappings
-- Aggregation rules (SUM vs AVG)
-- Common query patterns
-- Domain-specific disambiguation
-- Query rules (e.g., "Don't filter unless explicitly mentioned")
+- Schema introspection (column names, types) — built-in
+- Sample data rows — built-in
+- Metric class lookups from CSV files via DuckDB's `read_csv_auto()`
+- Distinct values, date ranges, row counts — custom queries
 
-Each tool has its own semantic layer configuration in its `semantic_layer` section.
+### 2. Metric Classes CSV (reference data)
+
+A CSV file mapping data types to their aggregation behavior:
+
+```csv
+MetricClass,TypeCode,SQLOperations
+Cumulative,StepCount,SUM
+Discrete,HeartRate,AVG/MIN/MAX
+Event,HighHeartRateEvent,COUNT
+```
+
+**MetricClass definitions:**
+- **Cumulative**: Additive within time period. Use `SUM(value)`.
+- **Discrete**: Independent point-in-time measurement. Use `AVG/MIN/MAX(value)`. Never SUM.
+- **Event**: Occurrence count. Use `COUNT(*)`. Value column is NULL or irrelevant.
+
+Loaded via auto query: `SELECT * FROM read_csv_auto('metric_classes.csv')`
+
+### 3. Static Context (config-driven hints)
+
+Domain knowledge the LLM can't infer from data:
+
+```json
+"static_context": [
+  "=== DATE HANDLING ===",
+  "For 'today': WHERE CAST(start_date AS DATE) = CURRENT_DATE",
+  
+  "=== NATURAL LANGUAGE MAPPINGS ===",
+  "'steps' = StepCount",
+  "'heart rate' = HeartRate"
+]
+```
+
+Keep static context focused on:
+- Database engine syntax
+- Date/time patterns
+- Natural language → type mappings (aliases)
+- Domain-specific logic (e.g., sleep stages, workout handling)
 
 ## MCP Response Structure
 
@@ -405,36 +443,29 @@ project-root/
 ├── llm_client.py         # LLM communication via LiteLLM
 ├── query_executor.py     # SQL execution + retry logic
 ├── query_logger.py       # Audit logging
+├── metric_classes.csv    # MetricClass → TypeCode → SQLOperations mapping
 └── [data files]          # DuckDB, Parquet, or CSV files
 ```
 
-## Appendix: Sample Static Context Categories
+## Appendix: Static Context Categories
 
-Adapt these categories for your domain's `data_query.semantic_layer.static_context`:
+After implementing metric classes via CSV, keep static_context focused on domain knowledge:
 
 ```
-=== DATABASE ENGINE ===
-[Syntax notes, function names specific to your DB]
+=== METRIC CLASS DEFINITIONS ===
+[Brief description of Cumulative, Discrete, Event]
 
-=== SCHEMA ===
-[Table and column descriptions]
+=== DATABASE ENGINE ===
+[Syntax notes specific to your DB]
 
 === DATE HANDLING ===
-[Date formats, casting requirements, common date patterns]
+[Date formats, casting, common patterns like 'today', 'last week']
 
-=== QUERY RULES ===
-Do not filter on columns unless the question explicitly mentions them.
-[Other behavioral guidance for the LLM]
+=== DOMAIN-SPECIFIC LOGIC ===
+[Sleep stages, workout handling, special column semantics]
 
-=== TYPE/CATEGORY MAPPINGS ===
-[Natural language synonyms → actual database values]
-
-=== AGGREGATION RULES ===
-[Which metrics to SUM vs AVG, special calculations]
-
-=== COMMON QUERY PATTERNS ===
-[Proven SQL patterns for frequent question types]
-
-=== OUTPUT GUIDELINES ===
-[Column aliasing, rounding, ordering conventions]
+=== NATURAL LANGUAGE MAPPINGS ===
+[Aliases: 'steps' = StepCount, 'HR' = HeartRate]
 ```
+
+Aggregation rules (SUM vs AVG) are now handled by the metric_classes.csv lookup.
