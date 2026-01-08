@@ -1,5 +1,6 @@
 from litellm import completion
 from typing import Optional
+from datetime import date
 
 
 def call_llm(prompt: str, tool_config: dict) -> dict:
@@ -86,11 +87,13 @@ def generate_sql(
     response_prefix = prompt_format.get("response_prefix", "SELECT")
 
     # Build the core prompt
+    today = date.today().isoformat()
     base_prompt = f"""Generate a DuckDB SQL query to answer the question based on the schema and data below.
 
 {semantic_context}
 
 /* Query Rules */
+-- Today's date is: {today}
 -- Return ONLY a valid DuckDB SQL SELECT statement
 -- The table is named: {table_name}
 -- Use single quotes for strings; escape apostrophes by doubling: 'O''Brien'

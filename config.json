@@ -7,8 +7,6 @@
       "no_think": true,
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
-        "include_sample_rows": true,
-        "sample_row_count": 8,
         "hint_style": "sql_comment",
         "response_prefix": "SELECT"
       }
@@ -21,23 +19,23 @@
     },
     "semantic_layer": {
       "auto_queries": [
-        "SELECT MetricClass, TypeCode, SQLOperations FROM read_csv_auto('/Users/scottbartlow/PycharmProjects/healthkit-mcp-v4/metric_classes.csv') ORDER BY MetricClass, TypeCode",
-        "SELECT DISTINCT type, unit FROM {query_target} WHERE unit IS NOT NULL ORDER BY type",
-        "SELECT type, COUNT(*) as row_count FROM {query_target} GROUP BY type ORDER BY row_count DESC LIMIT 30",
-        "SELECT DISTINCT source_name FROM {query_target} WHERE source_name IS NOT NULL ORDER BY source_name"
+        {
+          "label": "record class to type column mapping",
+          "query": "SELECT MetricClass, TypeCode, SQLOperations FROM read_csv_auto('/Users/scottbartlow/PycharmProjects/healthkit-mcp-v4/classes.csv') ORDER BY MetricClass, TypeCode"
+        }
       ],
       "static_context": [
         "=== TABLE OVERVIEW ===",
-        "The health table contains Apple HealthKit data flattened into a single table. All record types (metrics, workouts, sleep, etc.) share the same schema. The 'type' column distinguishes record types and maps to a MetricClass (see metric_classes.csv) which determines the correct aggregation: SUM for Cumulative, AVG/MIN/MAX for Discrete, COUNT for Event.",
-        "Some columns are type-specific: 'value' is the numeric measurement (NULL for workouts and category-based types); 'value_category' is used by SleepAnalysis and AppleStandHour instead of value; 'duration_min', 'distance_km', 'energy_kcal' are workout-specific; 'start_lat', 'start_lon' are GPS coordinates for workouts only.",
-
-        "=== METRIC CLASS DEFINITIONS ===",
-        "Cumulative: Multiple records are additive within a time period. Use SUM(value).",
-        "Discrete: Each record is an independent point-in-time measurement. Use AVG(value), MIN(value), or MAX(value). Never SUM.",
-        "Event: Records represent occurrences, not measurements. Use COUNT(*). The value column is NULL or irrelevant.",
+        "The health table contains Apple HealthKit data flattened into a single table.",
+        "The table contains 3 classes of records:",
+        "*Cumulative: Multiple records are additive within a time period. Use SUM(value).",
+        "*Discrete: Each record is an independent point-in-time measurement. Use AVG(value), MIN(value), or MAX(value). Never SUM.",
+        "*Event: Records represent occurrences, not measurements. Use COUNT(*).",
+        "The 'type' column maps to Class (see classes.csv) which determines the correct aggregation.",
+        "Date columns are start_date and end_date, stored as VARCHAR in 'YYYY-MM-DD HH:MM:SS' format. Cast to TIMESTAMP or DATE for comparisons.",
 
         "=== DATABASE ENGINE ===",
-        "DuckDB syntax only. Use CAST(start_date AS TIMESTAMP) for date operations.",
+        "DuckDB syntax only.",
 
 
         "=== NATURAL LANGUAGE TO TYPE MAPPINGS ===",
@@ -75,8 +73,6 @@
       "no_think": true,
       "prompt_format": {
         "structure": "ddl-samples-hints-question",
-        "include_sample_rows": false,
-        "sample_row_count": 8,
         "hint_style": "sql_comment",
         "response_prefix": "SELECT"
       }

@@ -82,10 +82,7 @@ def build_semantic_context(tool_config: dict) -> dict:
 
     context = {
         "schema_ddl": "",
-        "sample_data": "",
         "column_info": [],
-        "categorical_values": {},
-        "date_range": {},
         "hints": []
     }
 
@@ -106,81 +103,22 @@ def build_semantic_context(tool_config: dict) -> dict:
             ddl_lines.append(f"    {col_name} {col_type}{comma}")
 
         ddl_lines.append(");")
-        ddl_lines.append(f"-- Query this table as: SELECT ... FROM {table_name} WHERE ...")
         context["schema_ddl"] = "\n".join(ddl_lines)
     except Exception as e:
         context["schema_ddl"] = f"-- Schema introspection failed: {e}"
 
-    # 2. Get sample data rows (CSV format for better LLM comprehension)
-    if prompt_format.get("include_sample_rows", True):
-        sample_count = prompt_format.get("sample_row_count", 8)
-        try:
-            sample_query = f"SELECT * FROM {query_target} ORDER BY RANDOM() LIMIT {sample_count}"
-            rows = con.execute(sample_query).fetchall()
-
-            # Format as CSV (clearer for LLMs than Python tuples)
-            sample_lines = []
-
-            # CSV header
-            col_names = [col["name"] for col in context["column_info"]]
-            sample_lines.append(",".join(col_names))
-
-            # CSV data rows with proper quoting
-            for row in rows:
-                csv_values = []
-                for val in row:
-                    if val is None:
-                        csv_values.append("")
-                    elif isinstance(val, str):
-                        # Escape quotes and wrap strings
-                        escaped = val.replace('"', '""')
-                        csv_values.append(f'"{escaped}"')
-                    else:
-                        csv_values.append(str(val))
-                sample_lines.append(",".join(csv_values))
-
-            context["sample_data"] = "\n".join(sample_lines)
-        except Exception as e:
-            context["sample_data"] = f"(sample query failed: {e})"
-
-    # 3. Auto-detect categorical columns and get distinct values
-    # (string columns with relatively few distinct values)
-    try:
-        for col_info in context["column_info"]:
-            col_name = col_info["name"]
-            col_type = col_info["type"]
-
-            if col_type == "VARCHAR":
-                # Check cardinality
-                count_query = f"SELECT COUNT(DISTINCT {col_name}) FROM {query_target}"
-                distinct_count = con.execute(count_query).fetchone()[0]
-
-                # Only include if reasonable number of distinct values
-                if distinct_count and distinct_count <= 100:
-                    values_query = f"SELECT DISTINCT {col_name} FROM {query_target} WHERE {col_name} IS NOT NULL ORDER BY {col_name} LIMIT 100"
-                    values = con.execute(values_query).fetchall()
-                    context["categorical_values"][col_name] = [v[0] for v in values]
-    except Exception as e:
-        pass  # Categorical detection is best-effort
-
-    # 4. Auto-detect date range for timestamp/date columns
-    try:
-        for col_info in context["column_info"]:
-            col_name = col_info["name"]
-            col_type = col_info["type"].upper()
-
-            if "DATE" in col_type or "TIMESTAMP" in col_type or col_name.endswith("_date"):
-                range_query = f"SELECT MIN({col_name}), MAX({col_name}) FROM {query_target}"
-                min_val, max_val = con.execute(range_query).fetchone()
-                if min_val and max_val:
-                    context["date_range"][col_name] = {"min": str(min_val), "max": str(max_val)}
-    except Exception as e:
-        pass  # Date range detection is best-effort
-
-    # 5. Run any custom auto-queries from config
+    # 2. Run any custom auto-queries from config
     auto_queries = tool_config["semantic_layer"].get("auto_queries", [])
     context["auto_query_results"] = []
-    for query_template in auto_queries:
+    for query_config in auto_queries:
+        # Support both string (legacy) and dict format
+        if isinstance(query_config, str):
+            query_template = query_config
+            label = None
+        else:
+            query_template = query_config["query"]
+            label = query_config.get("label")
+        
         try:
             query = query_template.replace("{query_target}", query_target).replace("{table_name}", table_name)
             # Also support legacy placeholder
@@ -190,16 +128,18 @@ def build_semantic_context(tool_config: dict) -> dict:
             rows = cursor.fetchall()
             context["auto_query_results"].append({
                 "query": query_template,
+                "label": label,
                 "columns": columns,
                 "rows": rows
             })
         except Exception as e:
             context["auto_query_results"].append({
                 "query": query_template,
+                "label": label,
                 "error": str(e)
             })
 
-    # 6. Add static hints from config
+    # 3. Add static hints from config
     context["hints"] = tool_config["semantic_layer"].get("static_context", [])
 
     con.close()
@@ -230,42 +170,15 @@ def format_context_for_prompt(context: dict, tool_config: dict = None) -> str:
     parts.append("/* Table Schema */")
     parts.append(context["schema_ddl"])
 
-    # Sample data
-    if context.get("sample_data"):
-        parts.append("\n/* Sample Data (CSV format) */")
-        parts.append(context["sample_data"])
-
-    # Categorical values
-    if context.get("categorical_values"):
-        parts.append("\n/* Categorical Column Values */")
-        for col_name, values in context["categorical_values"].items():
-            if len(values) <= 20:
-                values_str = ", ".join([f"'{v}'" for v in values])
-            else:
-                values_str = ", ".join([f"'{v}'" for v in values[:20]]) + f" ... ({len(values)} total)"
-
-            if hint_style == "sql_comment":
-                parts.append(f"-- {col_name}: {values_str}")
-            else:
-                parts.append(f"{col_name}: {values_str}")
-
-    # Date ranges
-    if context.get("date_range"):
-        parts.append("\n/* Date Ranges */")
-        for col_name, range_info in context["date_range"].items():
-            if hint_style == "sql_comment":
-                parts.append(f"-- {col_name}: {range_info['min']} to {range_info['max']}")
-            else:
-                parts.append(f"{col_name}: {range_info['min']} to {range_info['max']}")
-
     # Auto query results (dynamic context from config-defined queries)
     if context.get("auto_query_results"):
         for result in context["auto_query_results"]:
             if "error" in result:
                 parts.append(f"\n/* Auto query failed: {result['error']} */")
             else:
-                # Format as CSV for LLM readability
-                parts.append(f"\n/* Auto Query Result */")
+                # Use label if provided, otherwise generic header
+                label = result.get("label") or "Auto Query Result"
+                parts.append(f"\n/* {label} */")
                 columns = result["columns"]
                 rows = result["rows"]
                 parts.append(",".join(columns))
