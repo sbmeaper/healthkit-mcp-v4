@@ -57,13 +57,14 @@ The health table is a flattened representation of Apple HealthKit data. All reco
 
 ### Record Classes
 
-Records fall into three classes, each requiring different SQL aggregation:
+Records fall into four classes, each requiring different SQL aggregation:
 
 | Class | Description | Aggregation | Example Types |
 |-------|-------------|-------------|---------------|
 | Cumulative | Additive within time period | SUM(value) | StepCount, ActiveEnergyBurned, DistanceWalkingRunning |
 | Discrete | Independent point-in-time measurement | AVG/MIN/MAX(value) | HeartRate, RestingHeartRate, BodyMass, VO2Max |
-| Event | Occurrence count | COUNT(*) | Workouts, SleepAnalysis stages |
+| Event | Occurrence count | COUNT(*) | SleepAnalysis stages, HighHeartRateEvent |
+| Workout | Single workout session | COUNT(*), SUM/AVG on duration_min, distance_km, energy_kcal | WorkoutCycling, WorkoutWalking, WorkoutPickleball |
 
 The `classes.csv` file maps each `type` value to its class and correct SQL operation.
 
@@ -188,10 +189,11 @@ Domain knowledge organized into sections:
 ```
 === TABLE OVERVIEW ===
 The health table contains Apple HealthKit data flattened into a single table.
-The table contains 3 classes of records:
+The table contains 4 classes of records:
 *Cumulative: Multiple records are additive within a time period. Use SUM(value).
 *Discrete: Each record is an independent point-in-time measurement. Use AVG(value), MIN(value), or MAX(value). Never SUM.
 *Event: Records represent occurrences, not measurements. Use COUNT(*).
+*Workout: Each record is a single workout session. Use COUNT(*) for number of workouts. Use SUM/AVG on duration_min, distance_km, energy_kcal for totals or averages. Workout types are stored as 'Workout' + activity name (e.g., WorkoutCycling, WorkoutWalking). Workout records also have start_lat and start_lon columns for GPS starting location.
 The 'type' column maps to Class (see classes.csv) which determines the correct aggregation.
 Date columns are start_date and end_date, stored as VARCHAR in 'YYYY-MM-DD HH:MM:SS' format. Cast to TIMESTAMP or DATE for comparisons.
 
@@ -201,7 +203,9 @@ DuckDB syntax only.
 === NATURAL LANGUAGE TO TYPE MAPPINGS ===
 'steps' = StepCount
 'heart rate' or 'HR' or 'pulse' = HeartRate
-[... additional mappings ...]
+'cycling' or 'bike ride' = WorkoutCycling
+'HIIT' or 'interval training' = WorkoutHighIntensityIntervalTraining
+[... additional mappings for 20 workout types ...]
 ```
 
 ## Prompt Construction
@@ -288,3 +292,32 @@ healthkit-mcp-v4/
 4. **Lean prompts** — Minimize tokens while maintaining accuracy
 5. **Dynamic date injection** — LLM always knows today's date
 6. **Labeled auto-queries** — LLM understands what reference data means
+
+## Change Log
+
+### 2026-01-09: Added Workout Class to Semantic Layer
+
+**Summary**: Extended the semantic layer to properly handle workout records as a distinct fourth record class.
+
+**Changes made**:
+
+1. **config.json — TABLE OVERVIEW section**:
+   - Changed "3 classes" to "4 classes"
+   - Added Workout class description with guidance on columns (duration_min, distance_km, energy_kcal, start_lat, start_lon) and aggregation patterns
+
+2. **config.json — NATURAL LANGUAGE TO TYPE MAPPINGS section**:
+   - Added 7 new mappings: HIIT, elliptical, core training, cooldown, skiing, rowing, pilates
+
+3. **classes.csv**:
+   - Added all 20 workout types found in the data with MetricClass=Workout and SQLOperations=COUNT/SUM/AVG
+
+**Test queries** (run via Claude Desktop to verify LLM generates correct SQL):
+
+| Query | Expected Behavior |
+|-------|-------------------|
+| "How many cycling workouts did I do last month?" | COUNT(*) with type='WorkoutCycling' |
+| "What was my total cycling distance in 2024?" | SUM(distance_km) with type='WorkoutCycling' |
+| "Average duration of my HIIT workouts" | AVG(duration_min) with type='WorkoutHighIntensityIntervalTraining' |
+| "How many calories did I burn in pickleball this year?" | SUM(energy_kcal) with type='WorkoutPickleball' |
+| "Show my elliptical workouts from December" | SELECT with type='WorkoutElliptical' and date filter |
+| "List workouts near Austin" | Uses start_lat/start_lon with coordinate bounding box |

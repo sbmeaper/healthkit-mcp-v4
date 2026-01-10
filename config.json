@@ -27,11 +27,15 @@
       "static_context": [
         "=== TABLE OVERVIEW ===",
         "The health table contains Apple HealthKit data flattened into a single table.",
-        "The table contains 3 classes of records:",
+
+        "The table contains 4 classes of records:",
         "*Cumulative: Multiple records are additive within a time period. Use SUM(value).",
         "*Discrete: Each record is an independent point-in-time measurement. Use AVG(value), MIN(value), or MAX(value). Never SUM.",
         "*Event: Records represent occurrences, not measurements. Use COUNT(*).",
-        "The 'type' column maps to Class (see classes.csv) which determines the correct aggregation.",
+        "*Workout: Each record is a single workout session. Use COUNT(*) for number of workouts. Use SUM/AVG on duration_min, distance_km, energy_kcal for totals or averages. Workout types are stored as 'Workout' + activity name (e.g., WorkoutCycling, WorkoutWalking). Workout records also have start_lat and start_lon columns for GPS starting location.",
+
+        "The 'type' column maps to Class which determines the correct aggregation.",
+
         "Date columns are start_date and end_date, stored as VARCHAR in 'YYYY-MM-DD HH:MM:SS' format. Cast to TIMESTAMP or DATE for comparisons.",
 
         "=== DATABASE ENGINE ===",
@@ -60,7 +64,14 @@
         "'hike' = WorkoutHiking",
         "'pickleball' = WorkoutPickleball",
         "'strength training' or 'weights' = WorkoutFunctionalStrengthTraining",
-        "'yoga' = WorkoutYoga"
+        "'yoga' = WorkoutYoga",
+        "'HIIT' or 'interval training' = WorkoutHighIntensityIntervalTraining",
+        "'elliptical' = WorkoutElliptical",
+        "'core training' or 'core workout' = WorkoutCoreTraining",
+        "'cooldown' = WorkoutCooldown",
+        "'skiing' or 'downhill skiing' = WorkoutDownhillSkiing",
+        "'rowing' = WorkoutRowing",
+        "'pilates' = WorkoutPilates"
       ]
     }
   },
